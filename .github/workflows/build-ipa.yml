@@ -7,7 +7,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false   # don't auto-init, we'll do it manually
+
+      - name: Init submodules (skip unregistered ones)
+        run: |
+          git submodule init
+          git submodule update --depth=1 || true
 
       - uses: actions/setup-java@v4
         with:

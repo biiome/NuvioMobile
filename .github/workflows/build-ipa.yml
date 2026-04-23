@@ -18,6 +18,9 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Create local.properties
+        run: touch local.properties
+        
       - name: Build iOS framework
         run: ./gradlew :composeApp:compileKotlinIosArm64
 

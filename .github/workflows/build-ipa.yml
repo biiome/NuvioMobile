@@ -11,8 +11,7 @@ jobs:
 
       - name: Init submodules (skip unregistered ones)
         run: |
-          git submodule init
-          git submodule update --depth=1 || true
+          git submodule update --init --depth=1 MPVKit
 
       - uses: actions/setup-java@v4
         with:

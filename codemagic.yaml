@@ -1,26 +1,34 @@
 workflows:
   ios-unsigned:
     name: iOS Unsigned IPA
-    max_build_duration: 60
     instance_type: mac_mini_m2
+    max_build_duration: 60
     environment:
       java: 17
+      xcode: latest
+      vars:
+        XCODE_PROJECT: iosApp/iosApp.xcodeproj
+        XCODE_TARGET: iosApp
+        XCODE_CONFIG: Release
     triggering:
       events:
         - push
+    cache:
+      cache_paths:
+        - $HOME/.gradle/caches
+        - $HOME/.konan
+        - $CM_BUILD_DIR/.gradle
     scripts:
-      - name: Init MPVKit submodule
-        script: git submodule update --init --depth=1 MPVKit
       - name: Create local.properties
         script: touch local.properties
-      - name: Build unsigned .app
+      - name: Build unsigned app
         script: |
           set -euo pipefail
-          mkdir -p build/products
+          xcode-project use-profiles --warn-only || true
           xcodebuild \
-            -project iosApp/iosApp.xcodeproj \
-            -target iosApp \
-            -configuration Release \
+            -project "$XCODE_PROJECT" \
+            -target "$XCODE_TARGET" \
+            -configuration "$XCODE_CONFIG" \
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
             SYMROOT="$CM_BUILD_DIR/build/products" \
@@ -34,19 +42,17 @@ workflows:
             PROVISIONING_PROFILE_SPECIFIER="" \
             EXPANDED_CODE_SIGN_IDENTITY="" \
             build
-      - name: Package IPA
+      - name: Package unsigned IPA
         script: |
           set -euo pipefail
-          APP_PATH="$(find build/products/Release-iphoneos -maxdepth 1 -name '*.app' | head -n1)"
-          if [ -z "$APP_PATH" ]; then
-            echo "No .app produced"; exit 1
-          fi
-          echo "Found app: $APP_PATH"
-          mkdir -p build/ipa/Payload
-          cp -R "$APP_PATH" build/ipa/Payload/
-          APP_NAME="$(basename "$APP_PATH" .app)"
-          cd build/ipa
-          zip -qry "${APP_NAME}-unsigned.ipa" Payload
-          ls -lh *.ipa
+          APP="$(find "$CM_BUILD_DIR/build/products/Release-iphoneos" -maxdepth 1 -name '*.app' | head -n1)"
+          [ -n "$APP" ] || { echo "No .app produced"; exit 1; }
+          STAGE="$CM_BUILD_DIR/build/ipa"
+          mkdir -p "$STAGE/Payload"
+          cp -R "$APP" "$STAGE/Payload/"
+          NAME="$(basename "$APP" .app)"
+          (cd "$STAGE" && zip -qry "${NAME}-unsigned.ipa" Payload)
+          ls -lh "$STAGE"/*.ipa
     artifacts:
       - build/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log

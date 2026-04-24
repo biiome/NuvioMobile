@@ -19,6 +19,8 @@ workflows:
         - $HOME/.konan
         - $CM_BUILD_DIR/.gradle
     scripts:
+      - name: Init MPVKit submodule
+        script: git submodule update --init --depth=1 MPVKit
       - name: Create local.properties
         script: touch local.properties
       - name: Build unsigned app

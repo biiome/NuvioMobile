@@ -36,6 +36,7 @@ jobs:
             -destination "generic/platform=iOS" \
             SYMROOT="$PWD/build/products" \
             OBJROOT="$PWD/build/intermediates" \
+            IPHONEOS_DEPLOYMENT_TARGET=18.0 \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \

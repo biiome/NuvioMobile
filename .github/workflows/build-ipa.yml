@@ -27,14 +27,15 @@ jobs:
       - name: Build unsigned .app
         run: |
           set -euo pipefail
-          mkdir -p build/derived
+          mkdir -p build/products
           xcodebuild \
             -project iosApp/iosApp.xcodeproj \
             -target iosApp \
             -configuration Release \
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
-            -derivedDataPath build/derived \
+            SYMROOT="$PWD/build/products" \
+            OBJROOT="$PWD/build/intermediates" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -48,7 +49,7 @@ jobs:
       - name: Package IPA
         run: |
           set -euo pipefail
-          APP_PATH="$(find build/derived/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -n1)"
+          APP_PATH="$(find build/products/Release-iphoneos -maxdepth 1 -name '*.app' | head -n1)"
           if [ -z "$APP_PATH" ]; then
             echo "No .app produced"; exit 1
           fi

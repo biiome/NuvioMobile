@@ -1,0 +1,52 @@
+workflows:
+  ios-unsigned:
+    name: iOS Unsigned IPA
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      java: 17
+    triggering:
+      events:
+        - push
+    scripts:
+      - name: Init MPVKit submodule
+        script: git submodule update --init --depth=1 MPVKit
+      - name: Create local.properties
+        script: touch local.properties
+      - name: Build unsigned .app
+        script: |
+          set -euo pipefail
+          mkdir -p build/products
+          xcodebuild \
+            -project iosApp/iosApp.xcodeproj \
+            -target iosApp \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            SYMROOT="$CM_BUILD_DIR/build/products" \
+            OBJROOT="$CM_BUILD_DIR/build/intermediates" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            EXPANDED_CODE_SIGN_IDENTITY="" \
+            build
+      - name: Package IPA
+        script: |
+          set -euo pipefail
+          APP_PATH="$(find build/products/Release-iphoneos -maxdepth 1 -name '*.app' | head -n1)"
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app produced"; exit 1
+          fi
+          echo "Found app: $APP_PATH"
+          mkdir -p build/ipa/Payload
+          cp -R "$APP_PATH" build/ipa/Payload/
+          APP_NAME="$(basename "$APP_PATH" .app)"
+          cd build/ipa
+          zip -qry "${APP_NAME}-unsigned.ipa" Payload
+          ls -lh *.ipa
+    artifacts:
+      - build/ipa/*.ipa

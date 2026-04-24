@@ -1,5 +1,7 @@
 name: Build IPA
-on: workflow_dispatch
+on:
+  push:
+  workflow_dispatch:
 
 jobs:
   build:
@@ -7,41 +9,59 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: false   # don't auto-init, we'll do it manually
+          submodules: false
 
-      - name: Init submodules (skip unregistered ones)
-        run: |
-          git submodule update --init --depth=1 MPVKit
+      - name: Init MPVKit submodule
+        run: git submodule update --init --depth=1 MPVKit
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
 
+      - uses: gradle/actions/setup-gradle@v4
+
       - name: Create local.properties
         run: touch local.properties
-        
-      - name: Build iOS framework
-        run: ./gradlew :composeApp:compileKotlinIosArm64
 
-      - name: Archive
+      - name: Build unsigned .app
         run: |
-          xcodebuild archive \
+          set -euo pipefail
+          mkdir -p build/derived
+          xcodebuild \
             -project iosApp/iosApp.xcodeproj \
-            -scheme iosApp \
+            -target iosApp \
+            -configuration Release \
+            -sdk iphoneos \
             -destination "generic/platform=iOS" \
-            -archivePath build/Nuvio.xcarchive \
-            CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            -derivedDataPath build/derived \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="" \
+            PROVISIONING_PROFILE_SPECIFIER="" \
+            EXPANDED_CODE_SIGN_IDENTITY="" \
+            build
 
-      - name: Export IPA
+      - name: Package IPA
         run: |
-          xcodebuild -exportArchive \
-            -archivePath build/Nuvio.xcarchive \
-            -exportPath build/ipa \
-            -exportOptionsPlist iosApp/ExportOptions.plist
+          set -euo pipefail
+          APP_PATH="$(find build/derived/Build/Products/Release-iphoneos -maxdepth 1 -name '*.app' | head -n1)"
+          if [ -z "$APP_PATH" ]; then
+            echo "No .app produced"; exit 1
+          fi
+          echo "Found app: $APP_PATH"
+          mkdir -p build/ipa/Payload
+          cp -R "$APP_PATH" build/ipa/Payload/
+          APP_NAME="$(basename "$APP_PATH" .app)"
+          cd build/ipa
+          zip -qry "${APP_NAME}-unsigned.ipa" Payload
+          ls -lh *.ipa
 
       - uses: actions/upload-artifact@v4
         with:
-          name: Nuvio-IPA
+          name: Nuvio-IPA-${{ github.sha }}
           path: build/ipa/*.ipa
+          if-no-files-found: error
